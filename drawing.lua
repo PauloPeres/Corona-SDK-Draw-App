@@ -57,7 +57,7 @@ function d:new(array)
 	local min = 5;
 	local max = 15;
 	-- Size of the overdraw to do anti-aliasing
-	local overdraw  = 1.5;
+	local overdraw  = 1;
 	
 	local triagleGroup = display.newGroup();
 	local objArray = {};
@@ -461,6 +461,7 @@ function d:new(array)
 			triagleGroup:removeSelf();
 		end
 		triagleGroup = nil;
+		triagleGroup = display.newGroup();
 	end
 	group.changeColor = function(colorArray)
 		lineColor = colorArray
