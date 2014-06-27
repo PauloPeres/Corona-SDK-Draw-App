@@ -15,6 +15,8 @@ local drawingGroup = require("drawing"):new({
 	}); 
 drawingGroup.x = _W*0.5;
 drawingGroup.y = _H*0.5;
+drawingGroup.width = width;
+drawingGroup.height = height
 -----------------------------------
 -- UNDO & Change Color FUNCTIONS (not required)
 -----------------------------------
@@ -26,7 +28,10 @@ local changeColor = function()
         color = { math.random(1,255)/255,math.random(1,255)/255,math.random(1,255)/255,1 } 
         drawingGroup.changeColor(color);
 end
+local saveButton = function()
 
+        drawingGroup.saveAsImage("saveBtn.png");
+end
  
 -----------------------------------
 -- UNDO & ERASE BUTTONS (not required)
@@ -40,7 +45,7 @@ local eraseButton = widget.newButton{
         cornerRadius = 8,
         onRelease = erase
         }
-        local eraseButton = widget.newButton{
+local colorButton = widget.newButton{
         left = display.contentWidth-325,
         top = display.contentHeight - 50,
         label = "Change Color",
@@ -48,6 +53,14 @@ local eraseButton = widget.newButton{
         cornerRadius = 8,
         onRelease = changeColor
         }
+local saveButton = widget.newButton{
+        left = display.contentWidth-210,
+        top = display.contentHeight - 50,
+        label = "Save Image",
+        width = 100, height = 28,
+        cornerRadius = 8,
+        onRelease = saveButton
+}
  
  
         

@@ -23,7 +23,7 @@
 
 require "Vector2D"
 local d = {}
-
+	
 function d:new(array)
 	-- Parameters
 	
@@ -58,15 +58,26 @@ function d:new(array)
 	local max = 15;
 	-- Size of the overdraw to do anti-aliasing
 	local overdraw  = 1.5;
+	
 	local triagleGroup = display.newGroup();
+	local objArray = {};
 	group:insert(canvas);
-	group:insert(triagleGroup);
+	--group:insert(triagleGroup);
 	canvas.x = 0;
 	canvas.y = 0;
-	triagleGroup.x = -canvas.width*0.5;
-	triagleGroup.y = -canvas.height*0.5
+
+	local dMinX = nil;
+	local dMaxX = nil;
+	local dMinY = nil;
+	local dMaxY = nil;
+	--canvas:insert(triagleGroup);
+	--triagleGroup.x = -canvas.width*0.5;
+	--triagleGroup.y = -canvas.height*0.5
+	--triagleGroup.width = canvas.width;
+	--triagleGroup.height = canvas.height
 	--triagleGroup.x = 0;
 	--triagleGroup.y = 0;
+
 	local function ADD_CIRCLE(vec,rotation)
 		
 		local myCircle2 = display.newCircle( vec.x,vec.y, vec.width + overdraw*0.5 )
@@ -81,6 +92,8 @@ function d:new(array)
 		myCircle2.alpha = 0.8;
 		myCircle2:setFillColor( lineColor[1],lineColor[2],lineColor[3],lineColor[4]);
 		triagleGroup:insert(myCircle2);
+
+		--table.insert(objArray,myCircle2);
 	end
 	
 	local function ADD_RETANGLE(A, B, C,D,cur, val,rotation)
@@ -100,7 +113,7 @@ function d:new(array)
 		local x = (b2-b1)/(m1-m2);
 		local y = m1*x+b1;
 
-			--]]
+		--]]
 
 		-- Finding the positions of the Rectangle
 		local minY = mMin(A.y,mMin(B.y,mMin(C.y,D.y)));
@@ -110,6 +123,16 @@ function d:new(array)
 		
 		local minX = mMin(A.x,mMin(B.x,mMin(C.x,D.x)));
 		local maxX = mMax(A.x,mMax(B.x,mMax(C.x,D.x)));
+		-- Discovering the boundering of the drawing;
+		
+		dMinY = mMin(minY,dMinY);
+		dMaxY = mMax(dMaxY,maxY);
+		dMinX = mMin(dMinX,minX);
+		dMaxX = mMax(dMaxX,maxX);
+
+		
+
+
 		-- Finding the Rectangle that incapsulate
 		local Q1 = Vector2D:new(minX,maxY)
 		local Q2 = Vector2D:new(minX,minY)
@@ -123,12 +146,15 @@ function d:new(array)
 		local x = (b2-b1)/(m1-m2);
 		local y = m1*x+b1;
 
-	--[[
+		--[[
 		local star = display.newLine(  Q1.x, Q1.y, Q3.x, Q3.y )
 		star:append(  Q4.x,Q4.y,Q2.x, Q2.y, Q1.x, Q1.y )
 		star:setStrokeColor( 1, 1, 1, 0.8 )
 		star.strokeWidth = 1
 		]]--
+		
+		
+
 		local vertices = { A.x,A.y,C.x,C.y,D.x,D.y,B.x,B.y }
 		local o = display.newPolygon( cur.x,cur.y, vertices )
 		--o.fill = { type="image", filename="pen_pattern.png" }
@@ -146,12 +172,12 @@ function d:new(array)
 		o:setStrokeColor( 1, 1, 1,0 )
 		o:setFillColor( lineColor[1],lineColor[2],lineColor[3],lineColor[4]);
 
-		triagleGroup:insert(o);
+		
 		--o.alpha = 0.9;
-		o.anchorX = 0.5;
-		o.anchorY = 0.5;
 		o.x = x;
 		o.y = y;
+		triagleGroup:insert(o);
+		--table.insert(objArray,o);
 	--[[
 		local newPoint = Vector2D:new( o.x, o.y)
 		local myCircleC2 = display.newCircle( x, y, 2 )
@@ -242,9 +268,11 @@ function d:new(array)
 			    if (finishingLine == true and (i == #linePoints)) then
 			    	ADD_CIRCLE(linePoints[#linePoints -1],rotation);
 			    	ADD_CIRCLE(curPoint,rotation);
-			      --[circlesPoints addObject:[linePoints objectAtIndex:i - 1]];
-			      --[circlesPoints addObject:pointValue];
-			      finishingLine = false;
+					--[circlesPoints addObject:[linePoints objectAtIndex:i - 1]];
+					--[circlesPoints addObject:pointValue];
+					
+					finishingLine = false;
+					
 			    end
 			    prevPoint = curPoint;
 			    prevValue = curValue;
@@ -374,14 +402,20 @@ function d:new(array)
 		addPoint(vec,width);
 	end
 	local function endLineAt(vec,width)
-		addPoint(vec,width);
 		finishingLine = true;
+		addPoint(vec,width);
+		
+		--save();
 	end
 
 	local newLine = function(event)
 	 	local point = Vector2D:new(event.x,event.y);
 	    
 		if event.phase=="began" then
+			if dMinX ==nil then dMinX = point.x end;
+			if dMaxX ==nil then dMaxX = point.x end;
+			if dMinY ==nil then dMinY = point.y end;
+			if dMaxY ==nil then dMaxY = point.y end;
 			prevC = nil;
 			prevD = nil;
 			points = {};
@@ -392,6 +426,7 @@ function d:new(array)
 			startNewLineFrom(point,size);
 			addPoint(point,size);
 			addPoint(point,size);
+			
 		elseif event.phase=="moved" then
 			-- skip points that are too close
 			local eps = 1.5;
@@ -422,16 +457,34 @@ function d:new(array)
 	-----------------------------------
 
 	group.cleanDraw = function()
-		if triagleGroup then 
+		if triagleGroup then
 			triagleGroup:removeSelf();
-			triagleGroup = nil;
 		end
-		triagleGroup = display.newGroup();
+		triagleGroup = nil;
 	end
 	group.changeColor = function(colorArray)
 		lineColor = colorArray
 	end
 	group.saveAsImage = function(imageName)
+		-- Creating a rectangle with the bounderies of the draw
+		local Q1 = Vector2D:new(dMinX,dMaxY)
+		local Q2 = Vector2D:new(dMinX,dMinY)
+		local Q3 = Vector2D:new(dMaxX,dMaxY)
+		local Q4 = Vector2D:new(dMaxX,dMinY);
+		local star = display.newLine(  Q1.x, Q1.y, Q3.x, Q3.y )
+		star:append(  Q4.x,Q4.y,Q2.x, Q2.y, Q1.x, Q1.y )
+		star:setStrokeColor( 0, 0, 0, 0 )
+		star.strokeWidth = 1
+
+		triagleGroup:insert(star);
+
+		display.save( triagleGroup, {
+			filename = imageName,
+			baseDir = system.DocumentsDirectory ,
+			isFullResolution = true,
+		} )
+		star:removeSelf();
+		
 	end
 	group.clean = function()
 
