@@ -55,11 +55,20 @@ function d:new(array)
 	local prevI;
 	-- INTERPOLATION OF THE SMOTH LINES
 	local min = 5;
-	local max = 15;
+	local max = 10;
+	-- Max Width min width;
+	local maxWidth = 2;
+	local minWidth = 1;
 	-- Size of the overdraw to do anti-aliasing
 	local overdraw  = 1;
+	-- Optimization of the code
+	local maxPoints = 500;
+	
+	local draw_count = 0;
+
 	
 	local triagleGroup = display.newGroup();
+
 	local objArray = {};
 	group:insert(canvas);
 	--group:insert(triagleGroup);
@@ -70,6 +79,9 @@ function d:new(array)
 	local dMaxX = nil;
 	local dMinY = nil;
 	local dMaxY = nil;
+
+	
+
 	--canvas:insert(triagleGroup);
 	--triagleGroup.x = -canvas.width*0.5;
 	--triagleGroup.y = -canvas.height*0.5
@@ -77,10 +89,68 @@ function d:new(array)
 	--triagleGroup.height = canvas.height
 	--triagleGroup.x = 0;
 	--triagleGroup.y = 0;
+	local function createDrawBounderies( xMax,xMin,yMax,yMin )
+		-- Creating a rectangle with the bounderies of the draw
+		local Q1 = Vector2D:new(xMin,yMax)
+		local Q2 = Vector2D:new(xMin,yMin)
+		local Q3 = Vector2D:new(xMax,yMax)
+		local Q4 = Vector2D:new(xMax,yMin);
+		local star = display.newLine(  Q1.x, Q1.y, Q3.x, Q3.y )
+		star:append(  Q4.x,Q4.y,Q2.x, Q2.y, Q1.x, Q1.y )
+		star:setStrokeColor( 0, 0, 0, 0 )
+		star.strokeWidth = 1
+		
+		triagleGroup:insert(star);
 
+
+		-- Finding the equation of the line
+		local m1 = (Q4.y - Q1.y) / (Q4.x- Q1.x);
+		local m2 = (Q3.y - Q2.y) / (Q3.x- Q2.x); 
+		local b1 =  Q1.y - (m1 * Q1.x);
+		local b2 =  Q2.y - (m2 * Q2.x);
+		local x = (b2-b1)/(m1-m2);
+		local y = m1*x+b1;
+
+		-- Returning the center;
+		return Vector2D:new(x,y);
+		--print(triagleGroup.width,triagleGroup.height);
+		--return {w = w,h = h};
+	end
+	local function optmizeDraw()
+		local filename= "temp"..draw_count..".png";
+		local center = createDrawBounderies(dMaxX,dMinX,dMaxY,dMinY );
+		local w = triagleGroup.width;
+		local h = triagleGroup.height;
+		display.save( triagleGroup, {
+			filename =filename,
+			baseDir = system.TemporaryDirectory ,
+			isFullResolution = true,
+		} )
+		draw_count = draw_count + 1;
+		
+
+		local img = display.newImageRect(filename,system.TemporaryDirectory,w,h);
+		img.x = center.x;
+		img.y = center.y;
+
+
+		if triagleGroup then
+			triagleGroup:removeSelf();
+		end
+		triagleGroup = nil;
+		triagleGroup = display.newGroup();
+
+		triagleGroup:insert(img);
+		local lastPoint = points[#points];
+
+		lMaxX = lastPoint.x;
+		lMinX = lastPoint.x;
+		lMaxY = lastPoint.y;
+		lMinY = lastPoint.y;
+	end
 	local function ADD_CIRCLE(vec,rotation)
 		
-		local myCircle2 = display.newCircle( vec.x,vec.y, vec.width + overdraw*0.5 )
+		local myCircle2 = display.newCircle( vec.x,vec.y, vec.width*0.5 + overdraw*0.5 )
 		
 		
 		myCircle2.fill = {
@@ -89,7 +159,7 @@ function d:new(array)
     		
 		}
 		myCircle2.fill.rotation = rotation;
-		myCircle2.alpha = 0.8;
+		--myCircle2.alpha = 0.8;
 		myCircle2:setFillColor( lineColor[1],lineColor[2],lineColor[3],lineColor[4]);
 		triagleGroup:insert(myCircle2);
 
@@ -97,41 +167,19 @@ function d:new(array)
 	end
 	
 	local function ADD_RETANGLE(A, B, C,D,cur, val,rotation)
-		
-		--[[
-		local star = display.newLine(  cur.x, cur.y, cur.x, cur.y )
-		star:append(  A.x,A.y,C.x,C.y,D.x,D.y,B.x,B.y ,A.x,A.y )
-		star:setStrokeColor( color[1],color[2],color[3] )
-		star.strokeWidth = 1
-
-		-- Eqation of the line
-		-- y = m*x+b;
-		local m1 = (D.y - A.y) / (D.x- A.x);
-		local m2 = (C.y - B.y) / (C.x- B.x); 
-		local b1 =  A.y - (m1 * A.x);
-		local b2 =  B.y - (m2 * B.x);
-		local x = (b2-b1)/(m1-m2);
-		local y = m1*x+b1;
-
-		--]]
-
 		-- Finding the positions of the Rectangle
 		local minY = mMin(A.y,mMin(B.y,mMin(C.y,D.y)));
-		
-
 		local maxY = mMax(A.y,mMax(B.y,mMax(C.y,D.y)));
-		
 		local minX = mMin(A.x,mMin(B.x,mMin(C.x,D.x)));
 		local maxX = mMax(A.x,mMax(B.x,mMax(C.x,D.x)));
-		-- Discovering the boundering of the drawing;
 		
-		dMinY = mMin(minY,dMinY);
+
+		-- Discovering the boundering of the drawing;
+		dMinY = mMin(dMinY,minY);
 		dMaxY = mMax(dMaxY,maxY);
 		dMinX = mMin(dMinX,minX);
 		dMaxX = mMax(dMaxX,maxX);
-
 		
-
 
 		-- Finding the Rectangle that incapsulate
 		local Q1 = Vector2D:new(minX,maxY)
@@ -146,79 +194,22 @@ function d:new(array)
 		local x = (b2-b1)/(m1-m2);
 		local y = m1*x+b1;
 
-		--[[
-		local star = display.newLine(  Q1.x, Q1.y, Q3.x, Q3.y )
-		star:append(  Q4.x,Q4.y,Q2.x, Q2.y, Q1.x, Q1.y )
-		star:setStrokeColor( 1, 1, 1, 0.8 )
-		star.strokeWidth = 1
-		]]--
-		
-		
-
 		local vertices = { A.x,A.y,C.x,C.y,D.x,D.y,B.x,B.y }
 		local o = display.newPolygon( cur.x,cur.y, vertices )
-		--o.fill = { type="image", filename="pen_pattern.png" }
-
 		o.fill = {
 		    type = "image",
     		filename = "pen_pattern.png",
-    		
-		    
-
 		}
 		o.fill.rotation = rotation;
 		--o.fill.effect = "composite.average"
 		o.strokeWidth = 0;
 		o:setStrokeColor( 1, 1, 1,0 )
 		o:setFillColor( lineColor[1],lineColor[2],lineColor[3],lineColor[4]);
-
-		
-		--o.alpha = 0.9;
 		o.x = x;
 		o.y = y;
 		triagleGroup:insert(o);
-		--table.insert(objArray,o);
-	--[[
-		local newPoint = Vector2D:new( o.x, o.y)
-		local myCircleC2 = display.newCircle( x, y, 2 )
 		
-		myCircleC2:setFillColor( color[1],color[2],color[3],0.5 )
-
-		local myCircleC = display.newCircle( newPoint.x, newPoint.y, 2 )
-		
-		myCircleC:setFillColor( color[1],color[2],color[3] )
-		
-		local myCircle = display.newCircle( Q1.x, Q1.y, 2 )
-		
-		myCircle:setFillColor( color[1],color[2],color[3] )
-		local myCircle2 = display.newCircle( Q2.x, Q2.y, 2 )
-		
-		myCircle2:setFillColor( color[1],color[2],color[3] )
-		local myCircle3 = display.newCircle( Q3.x, Q3.y, 2 )
-		
-		myCircle3:setFillColor( color[1],color[2],color[3] )
-		local myCircle4 = display.newCircle( Q4.x, Q4.y, 2 )
-		
-		myCircle4:setFillColor( color[1],color[2],color[3] )
-
-		
-		
-		
-		local myCircle = display.newCircle( cur.x, cur.y, 2 )
-		myCircle:setFillColor( color[1],color[2],color[3] )
-		local star = display.newLine(   o.x - o.width*0.5, o.y+o.height*0.5,  o.x - o.width*0.5, o.y+o.height*0.5 )
-		
-		star:setStrokeColor( color[1],color[2],color[3] )
-		star.strokeWidth = 1
-		star:append(   o.x - o.width*0.5, o.y+o.height*0.5)
-		star:append( o.x + o.width*0.5, o.y+o.height*0.5)
-		star:append(  o.x + o.width*0.5, o.y-o.height*0.5)
-		star:append(  o.x - o.width*0.5, o.y-o.height*0.5 )
-		]]--
-
-		
-		
-		
+			
 	end
 
 	local function drawLines(linePoints)
@@ -272,6 +263,10 @@ function d:new(array)
 					--[circlesPoints addObject:pointValue];
 					
 					finishingLine = false;
+					print("finishing line");
+					print("Trying to find a way to otimizate the drawing")
+					print("Myabe is Better to redraw as a single object the line that is complete.")
+					--optmizeDraw();
 					
 			    end
 			    prevPoint = curPoint;
@@ -318,7 +313,7 @@ function d:new(array)
 			    local prev1 = points[i - 1];
 			    local cur = points[i];
 			   
-			   -- print(prev2,prev1,cur,#points)
+			   	-- print(prev2,prev1,cur,#points)
 			    -- 3 Calculate our middle points between touch points.
 				local midPoint1 = Vector2D:Mult(Vector2D:Add(prev1, prev2), 0.5);
 			    local midPoint2 = Vector2D:Mult(Vector2D:Add(cur, prev1), 0.5);
@@ -335,7 +330,7 @@ function d:new(array)
 			    for j=1,numberOfSegments do
 			    	-- 6 Calculate our new points by using quad curve equation. Also use same interpolation for line width.
 			    	local newPoint = Vector2D:Add(Vector2D:Add(Vector2D:Mult(midPoint1, mPow(1 - t, 2)), Vector2D:Mult(prev1, 2 * (1 - t) * t)), Vector2D:Mult(midPoint2, t * t));
-			       	newPoint.width = math.pow(1 - t, 2) * ((prev1.width + prev2.width) * 0.5) + 2.0 * (1 - t) * t * prev1.width * t * t * ((cur.width + prev1.width) * 0.5);
+			       	newPoint.width = cur.width--math.pow(1 - t, 2) * ((prev1.width + prev2.width) * 0.5) + 2.0 * (1 - t) * t * prev1.width * t * t * ((cur.width + prev1.width) * 0.5);
 			     	--print(newPoint.width)
 			     	--newPoint.width = 2;
 			        table.insert(smoothedPoints, newPoint);
@@ -345,7 +340,7 @@ function d:new(array)
 			    local finalPoint = {};
 			    finalPoint = midPoint2;
 			    
-			    finalPoint.width = (cur.width ) * 0.5;
+			    finalPoint.width = (cur.width );
 			    
 			    --finalPoint.width = 2;
 			    table.insert(smoothedPoints, finalPoint);
@@ -372,22 +367,15 @@ function d:new(array)
 	end
 
 	local function extractSize(vec)
-
-	  --! result of trial & error
-	  local vel = Vector2D:Length(vec);
-
-	  local size = vel / 160.0;
-		
-	  size = mMin(mMax(1, size), 4);
-
-	  if #velocities > 1 then
-	    	--size = size * 0.2 / velocities[#velocities-1] *0.5;
-	  end
-	  
-	  --size =2;
-	  table.insert(velocities,size);
-	  
-	  return size;
+		local prevP = points[#points];
+		if prevP then
+			local d = mMin(mMax(minWidth,  Vector2D:Dist(vec,prevP)), maxWidth);
+			--print(d);
+			
+			return d;
+		else
+			return maxWidth;
+		end
 	end
 
 	local function addPoint(vec,width)
@@ -412,10 +400,16 @@ function d:new(array)
 	 	local point = Vector2D:new(event.x,event.y);
 	    
 		if event.phase=="began" then
+			-- Bouderies of the entire draw
 			if dMinX ==nil then dMinX = point.x end;
 			if dMaxX ==nil then dMaxX = point.x end;
 			if dMinY ==nil then dMinY = point.y end;
 			if dMaxY ==nil then dMaxY = point.y end;
+			-- Bounderies of the last line
+			if lMinX ==nil then lMinX = point.x end;
+			if lMaxX ==nil then lMaxX = point.x end;
+			if lMinY ==nil then lMinY = point.y end;
+			if lMaxY ==nil then lMaxY = point.y end;
 			prevC = nil;
 			prevD = nil;
 			points = {};
@@ -467,24 +461,15 @@ function d:new(array)
 		lineColor = colorArray
 	end
 	group.saveAsImage = function(imageName)
-		-- Creating a rectangle with the bounderies of the draw
-		local Q1 = Vector2D:new(dMinX,dMaxY)
-		local Q2 = Vector2D:new(dMinX,dMinY)
-		local Q3 = Vector2D:new(dMaxX,dMaxY)
-		local Q4 = Vector2D:new(dMaxX,dMinY);
-		local star = display.newLine(  Q1.x, Q1.y, Q3.x, Q3.y )
-		star:append(  Q4.x,Q4.y,Q2.x, Q2.y, Q1.x, Q1.y )
-		star:setStrokeColor( 0, 0, 0, 0 )
-		star.strokeWidth = 1
-
-		triagleGroup:insert(star);
+		
+		createDrawBounderies(dMaxX,dMinX,dMaxY,dMinY );
 
 		display.save( triagleGroup, {
 			filename = imageName,
 			baseDir = system.DocumentsDirectory ,
 			isFullResolution = true,
 		} )
-		star:removeSelf();
+		
 		
 	end
 	group.clean = function()
